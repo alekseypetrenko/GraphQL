@@ -22,30 +22,23 @@ const JOB_QUERY = gql`
   ${JOB_DETAIL_FRAGMENT}
 `;
 
-const client = new ApolloClient({
+export const JOBS_QUERY = gql`
+  query JobsQuery {
+    jobs {
+      id
+      title
+      company {
+        id
+        name
+      }
+    }
+  }
+`;
+
+export const client = new ApolloClient({
   uri: GRAPHQL_URL,
   cache: new InMemoryCache(),
 });
-
-export async function getJobs() {
-  const query = gql`
-    query JobsQuery {
-      jobs {
-        id
-        title
-        company {
-          id
-          name
-        }
-      }
-    }
-  `;
-  const {
-    data: { jobs },
-  } = await client.query({ query, fetchPolicy: "network-only" });
-
-  return jobs;
-}
 
 export async function getJob(id) {
   const variables = { id };
