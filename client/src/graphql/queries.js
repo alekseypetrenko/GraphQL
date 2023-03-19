@@ -2,6 +2,25 @@ import { ApolloClient, gql, InMemoryCache } from "@apollo/client";
 import { getAccessToken } from "../auth";
 
 const GRAPHQL_URL = "http://localhost:9000/graphql";
+const JOB_DETAIL_FRAGMENT = gql`
+  fragment JobDetail on Job {
+    id
+    title
+    company {
+      id
+      name
+    }
+    description
+  }
+`;
+const JOB_QUERY = gql`
+  query JobQuery($id: ID!) {
+    job(id: $id) {
+      ...JobDetail
+    }
+  }
+  ${JOB_DETAIL_FRAGMENT}
+`;
 
 const client = new ApolloClient({
   uri: GRAPHQL_URL,
@@ -15,6 +34,7 @@ export async function getJobs() {
         id
         title
         company {
+          id
           name
         }
       }
@@ -22,29 +42,16 @@ export async function getJobs() {
   `;
   const {
     data: { jobs },
-  } = await client.query({ query });
+  } = await client.query({ query, fetchPolicy: "network-only" });
 
   return jobs;
 }
 
 export async function getJob(id) {
-  const query = gql`
-    query JobQuery($id: ID!) {
-      job(id: $id) {
-        id
-        title
-        company {
-          id
-          name
-        }
-        description
-      }
-    }
-  `;
   const variables = { id };
   const {
     data: { job },
-  } = await client.query({ query, variables });
+  } = await client.query({ query: JOB_QUERY, variables });
   return job;
 }
 
@@ -74,9 +81,10 @@ export async function createJob(input) {
   const mutation = gql`
     mutation CreateJobMutation($input: CreateJobInput!) {
       job: createJob(input: $input) {
-        id
+        ...JobDetail
       }
     }
+    ${JOB_DETAIL_FRAGMENT}
   `;
 
   const variables = { input };
@@ -89,7 +97,18 @@ export async function createJob(input) {
 
   const {
     data: { job },
-  } = await client.mutate({ mutation, variables, context });
+  } = await client.mutate({
+    mutation,
+    variables,
+    context,
+    update: (cache, { data: { job } }) => {
+      cache.writeQuery({
+        query: JOB_QUERY,
+        variables: { id: job.id },
+        data: { job },
+      });
+    },
+  });
 
   return job;
 }
